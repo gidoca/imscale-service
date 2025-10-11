@@ -1,14 +1,18 @@
 use axum::{
     extract::{Path, Query},
-    http::{header, StatusCode},
-    response::{IntoResponse, Response},
+    http::{header, HeaderMap, HeaderValue, StatusCode},
+    response::{IntoResponse, Response, Json},
     routing::get,
     Router,
 };
+use chrono::{DateTime, Utc};
 use image::{self, imageops::FilterType, ImageReader};
 use serde::Deserialize;
+use serde_json::json;
 use std::env;
+use std::fs;
 use std::path::Path as FilePath;
+use std::time::SystemTime;
 use tower_http::services::ServeDir;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -20,18 +24,67 @@ struct ResizeParams {
     preserve_aspect_ratio: Option<bool>,
 }
 
-async fn resize_image(
-    Path(image_path): Path<String>,
-    Query(params): Query<ResizeParams>,
-) -> Result<Response, StatusCode> {
+async fn list_handler(Path(path): Path<String>) -> Result<Json<serde_json::Value>, StatusCode> {
     let base_dir = env::var("IMAGE_DIR").unwrap_or_else(|_| "images".to_string());
-    let full_path = FilePath::new(&base_dir).join(&image_path);
-    info!("Attempting to resize image: {:?}", full_path);
+    // Construct the full path
+    let full_path = if path.is_empty() {
+        FilePath::new(&base_dir)
+    } else {
+        &FilePath::new(&base_dir).join(path)
+    };
+    
+    info!("Attempting to list path: {:?}", full_path);
+
+    // Ensure the path starts with the base directory
+    if !full_path.starts_with(&base_dir) {
+        error!("Forbidden path: {:?}", full_path);
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    let metadata = match fs::metadata(full_path) {
+        Ok(m) => m,
+        Err(_) => return Err(StatusCode::NOT_FOUND),
+    };
+
+    if metadata.is_dir() {
+        let mut entries = Vec::new();
+        for entry in fs::read_dir(full_path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)? {
+            let entry = entry.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            let path = entry.path();
+            let name = path.file_name().unwrap().to_str().unwrap().to_string();
+            let entry_type = if path.is_dir() { "directory" } else { "file" };
+            entries.push(json!({ "name": name, "type": entry_type }));
+        }
+        Ok(Json(json!(entries)))
+    } else {
+        let modified_time: DateTime<Utc> = metadata.modified().unwrap_or(SystemTime::now()).into();
+        Ok(Json(json!({
+            "name": full_path.file_name().unwrap().to_str().unwrap(),
+            "size": metadata.len(),
+            "modified": modified_time.to_rfc3339(),
+        })))
+    }
+}
+
+async fn download_handler(Path(path): Path<String>, params: Query<ResizeParams>) -> Result<Response, StatusCode> {
+    let base_dir = env::var("IMAGE_DIR").unwrap_or_else(|_| "images".to_string());
+    let full_path = FilePath::new(&base_dir).join(&path);
+    info!("Attempting to download image: {:?}", full_path);
 
     if !full_path.starts_with(&base_dir) {
         error!("Forbidden path: {:?}", full_path);
         return Err(StatusCode::FORBIDDEN);
     }
+
+    let metadata = match fs::metadata(&full_path) {
+        Ok(metadata) => metadata,
+        Err(e) => {
+            error!("Failed to get metadata for file: {:?}, error: {}", full_path, e);
+            return Err(StatusCode::NOT_FOUND);
+        }
+    };
+
+    let modified_time: DateTime<Utc> = metadata.modified().unwrap_or(SystemTime::now()).into();
 
     let reader = match ImageReader::open(&full_path) {
         Ok(reader) => reader,
@@ -62,7 +115,7 @@ async fn resize_image(
     let resized_img = if params.preserve_aspect_ratio.unwrap_or(false) {
         img.resize(params.width, params.height, FilterType::Lanczos3)
     } else {
-        img.resize_exact(params.width, params.height, FilterType::Lanczos3)
+        img.resize_exact(params.0.width, params.0.height, FilterType::Lanczos3)
     };
 
     let mut buffer = Vec::new();
@@ -80,9 +133,23 @@ async fn resize_image(
         _ => "application/octet-stream",
     };
 
+    let headers = {
+        let mut headers = HeaderMap::new();
+        headers.insert(header::CONTENT_TYPE, HeaderValue::from_static(content_type));
+        headers.insert(
+            header::LAST_MODIFIED,
+            HeaderValue::from_str(&modified_time.to_rfc2822()).unwrap(),
+        );
+        headers.insert(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("public, max-age=31536000"),
+        );
+        headers
+    };
+
     info!("Successfully resized image: {:?}", full_path);
     Ok((
-        [(header::CONTENT_TYPE, content_type)],
+        headers,
         buffer,
     )
         .into_response())
@@ -98,7 +165,9 @@ async fn main() {
         .init();
 
     let app = Router::new()
-        .route("/images/{image_path}", get(resize_image))
+        .route("/list/{*path}", get(list_handler))
+        .route("/list/", get(|| list_handler(Path("".to_string()))))
+        .route("/download/{*path}", get(download_handler))
         .fallback_service(ServeDir::new("public"));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
