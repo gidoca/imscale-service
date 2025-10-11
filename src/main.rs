@@ -10,6 +10,7 @@ use serde::Deserialize;
 use std::env;
 use std::path::Path as FilePath;
 use tokio::fs;
+use tower_http::services::ServeDir;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -90,7 +91,9 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let app = Router::new().route("/{image_path}", get(resize_image));
+    let app = Router::new()
+        .route("/images/{image_path}", get(resize_image))
+        .fallback_service(ServeDir::new("public"));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     info!("Listening on {}", listener.local_addr().unwrap());
