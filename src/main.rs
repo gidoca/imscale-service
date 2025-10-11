@@ -5,11 +5,10 @@ use axum::{
     routing::get,
     Router,
 };
-use image::{self, imageops::FilterType};
+use image::{self, imageops::FilterType, ImageReader};
 use serde::Deserialize;
 use std::env;
 use std::path::Path as FilePath;
-use tokio::fs;
 use tower_http::services::ServeDir;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -34,15 +33,25 @@ async fn resize_image(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    let data = match fs::read(&full_path).await {
-        Ok(data) => data,
+    let reader = match ImageReader::open(&full_path) {
+        Ok(reader) => reader,
         Err(e) => {
-            error!("Failed to read image file: {:?}, error: {}", full_path, e);
+            error!("Failed to open image file: {:?}, error: {}", full_path, e);
             return Err(StatusCode::NOT_FOUND);
         }
     };
 
-    let img = match image::load_from_memory(&data) {
+    let reader = match reader.with_guessed_format() {
+        Ok(reader) => reader,
+        Err(e) => {
+            error!("Failed to guess image format: {:?}, error: {}", full_path, e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    let format = reader.format().unwrap_or(image::ImageFormat::Png);
+
+    let img = match reader.decode() {
         Ok(img) => img,
         Err(e) => {
             error!("Failed to decode image: {:?}, error: {}", full_path, e);
@@ -58,9 +67,6 @@ async fn resize_image(
 
     let mut buffer = Vec::new();
     let mut cursor = std::io::Cursor::new(&mut buffer);
-
-    let format = image::ImageFormat::from_path(&full_path)
-        .unwrap_or(image::ImageFormat::Png);
 
     if let Err(e) = resized_img.write_to(&mut cursor, format) {
         error!("Failed to encode image: {:?}, error: {}", full_path, e);
