@@ -17,6 +17,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 struct ResizeParams {
     width: u32,
     height: u32,
+    preserve_aspect_ratio: Option<bool>,
 }
 
 async fn resize_image(
@@ -48,7 +49,12 @@ async fn resize_image(
         }
     };
 
-    let resized_img = img.resize_exact(params.width, params.height, FilterType::Lanczos3);
+    let resized_img = if params.preserve_aspect_ratio.unwrap_or(false) {
+        img.resize(params.width, params.height, FilterType::Lanczos3)
+    } else {
+        img.resize_exact(params.width, params.height, FilterType::Lanczos3)
+    };
+
     let mut buffer = Vec::new();
     let mut cursor = std::io::Cursor::new(&mut buffer);
 
