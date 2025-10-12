@@ -16,6 +16,7 @@ use std::time::SystemTime;
 use tower_http::services::ServeDir;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use urlencoding;
 
 #[derive(Deserialize)]
 struct ResizeParams {
@@ -28,9 +29,10 @@ async fn list_handler(Path(path): Path<String>) -> Result<Json<serde_json::Value
     let base_dir = env::var("IMAGE_DIR").unwrap_or_else(|_| "images".to_string());
     // Construct the full path
     let full_path = if path.is_empty() {
-        FilePath::new(&base_dir)
+        FilePath::new(&base_dir).to_path_buf()
     } else {
-        &FilePath::new(&base_dir).join(path)
+        let decoded_path = urlencoding::decode(&path).unwrap_or_else(|_| path.clone().into());
+        FilePath::new(&base_dir).join(&*decoded_path)
     };
     
     info!("Attempting to list path: {:?}", full_path);
@@ -41,14 +43,14 @@ async fn list_handler(Path(path): Path<String>) -> Result<Json<serde_json::Value
         return Err(StatusCode::FORBIDDEN);
     }
 
-    let metadata = match fs::metadata(full_path) {
+    let metadata = match fs::metadata(&full_path) {
         Ok(m) => m,
         Err(_) => return Err(StatusCode::NOT_FOUND),
     };
 
     if metadata.is_dir() {
         let mut entries = Vec::new();
-        for entry in fs::read_dir(full_path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)? {
+        for entry in fs::read_dir(&full_path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)? {
             let entry = entry.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
             let path = entry.path();
             let name = path.file_name().unwrap().to_str().unwrap().to_string();
@@ -58,10 +60,24 @@ async fn list_handler(Path(path): Path<String>) -> Result<Json<serde_json::Value
         Ok(Json(json!(entries)))
     } else {
         let modified_time: DateTime<Utc> = metadata.modified().unwrap_or(SystemTime::now()).into();
+        
+        let (width, height) = match image::image_dimensions(&full_path) {
+            Ok((w, h)) => (w, h),
+            Err(e) => {
+                error!("Failed to read image dimensions for {:?}: {}", full_path, e);
+                (0, 0)
+            }
+        };
+
+        let download_url = format!("/download/{}", path);
+
         Ok(Json(json!({
             "name": full_path.file_name().unwrap().to_str().unwrap(),
             "size": metadata.len(),
             "modified": modified_time.to_rfc3339(),
+            "width": width,
+            "height": height,
+            "download_url": download_url,
         })))
     }
 }
@@ -170,7 +186,9 @@ async fn main() {
         .route("/download/{*path}", get(download_handler))
         .fallback_service(ServeDir::new("public"));
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let port = env::var("PORT").unwrap_or_else(|_| "3000".to_string());
+    let addr = format!("0.0.0.0:{}", port);
+    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     info!("Listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
 }
