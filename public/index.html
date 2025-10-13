@@ -34,6 +34,33 @@
             padding: 10px;
             background-color: #ddd;
         }
+        #popover {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #popover.hidden {
+            display: none;
+        }
+        #popover-image {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+        }
+        #close-button {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 40px;
+            color: white;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -42,21 +69,29 @@
         <span id="current-path">/</span>
     </div>
     <div id="image-grid"></div>
+    <div id="popover" class="hidden">
+        <span id="close-button">&times;</span>
+        <img id="popover-image">
+    </div>
 
     <script>
         let currentPath = '';
+        const popover = document.getElementById('popover');
+        const popoverImage = document.getElementById('popover-image');
+        const closeButton = document.getElementById('close-button');
+        let currentPopoverUpdater = null;
 
-        function createImageUpdater(imageElement) {
+        function createImageUpdater(imageElement, imagePath) {
             let lastWidth = 0;
             let lastHeight = 0;
             let debounceTimeout;
 
             function update() {
-                const imageWidth = imageElement.offsetWidth;
-                const imageHeight = imageElement.offsetHeight;
+                const imageWidth = imageElement.parentElement.offsetWidth;
+                const imageHeight = imageElement.parentElement.offsetHeight;
 
                 if (imageWidth > lastWidth || imageHeight > lastHeight) {
-                    const imageUrl = `http://localhost:3000/download/placeholder.png?width=${imageWidth}&height=${imageHeight}&preserve_aspect_ratio=true`;
+                    const imageUrl = `/download/${imagePath}?width=${imageWidth}&height=${imageHeight}&preserve_aspect_ratio=true`;
                     imageElement.src = imageUrl;
                     lastWidth = imageWidth;
                     lastHeight = imageHeight;
@@ -92,6 +127,7 @@
 
                 if (item.type === 'image') {
                     img.src = `/download/${fullPath}?width=200&height=200&preserve_aspect_ratio=true`;
+                    gridItem.addEventListener('click', () => openPopover(fullPath));
                 } else if (item.type === 'directory') {
                     img.src = '/icons/computer-folder-dual-tone-icon.svg';
                     gridItem.addEventListener('click', () => loadImages(fullPath));
@@ -110,10 +146,40 @@
             }
         }
 
+        function openPopover(imagePath) {
+            if (currentPopoverUpdater) {
+                window.removeEventListener('resize', currentPopoverUpdater.debouncedUpdate);
+            }
+
+            currentPopoverUpdater = createImageUpdater(popoverImage, imagePath);
+            popover.classList.remove('hidden');
+            
+            setTimeout(() => {
+                currentPopoverUpdater.update();
+                window.addEventListener('resize', currentPopoverUpdater.debouncedUpdate);
+            }, 0);
+        }
+
+        function closePopover() {
+            popover.classList.add('hidden');
+            popoverImage.src = '';
+            if (currentPopoverUpdater) {
+                window.removeEventListener('resize', currentPopoverUpdater.debouncedUpdate);
+                currentPopoverUpdater = null;
+            }
+        }
+
         document.getElementById('up-button').addEventListener('click', () => {
             const pathParts = currentPath.split('/');
             pathParts.pop();
             loadImages(pathParts.join('/'));
+        });
+
+        closeButton.addEventListener('click', closePopover);
+        popover.addEventListener('click', (e) => {
+            if (e.target === popover) {
+                closePopover();
+            }
         });
 
         window.addEventListener('load', () => loadImages(''));
