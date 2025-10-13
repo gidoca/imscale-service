@@ -26,24 +26,39 @@
     <img id="scaled-image" src="" alt="Scaled Image">
 
     <script>
-        const image = document.getElementById('scaled-image');
-        let lastWidth = 0;
-        let lastHeight = 0;
+        function createImageUpdater(imageElement) {
+            let lastWidth = 0;
+            let lastHeight = 0;
+            let debounceTimeout;
 
-        function updateImage() {
-            const imageWidth = image.offsetWidth;
-            const imageHeight = image.offsetHeight;
+            function update() {
+                const imageWidth = imageElement.offsetWidth;
+                const imageHeight = imageElement.offsetHeight;
 
-            if (imageWidth > lastWidth || imageHeight > lastHeight) {
-                const imageUrl = `http://localhost:3000/download/placeholder.png?width=${imageWidth}&height=${imageHeight}&preserve_aspect_ratio=true`;
-                image.src = imageUrl;
-                lastWidth = imageWidth;
-                lastHeight = imageHeight;
+                if (imageWidth > lastWidth || imageHeight > lastHeight) {
+                    const imageUrl = `http://localhost:3000/download/placeholder.png?width=${imageWidth}&height=${imageHeight}&preserve_aspect_ratio=true`;
+                    imageElement.src = imageUrl;
+                    lastWidth = imageWidth;
+                    lastHeight = imageHeight;
+                }
             }
+
+            function debouncedUpdate() {
+                clearTimeout(debounceTimeout);
+                debounceTimeout = setTimeout(update, 1000);
+            }
+
+            return {
+                update,
+                debouncedUpdate
+            };
         }
 
-        window.addEventListener('load', updateImage);
-        window.addEventListener('resize', updateImage);
+        const image = document.getElementById('scaled-image');
+        const imageUpdater = createImageUpdater(image);
+
+        window.addEventListener('load', imageUpdater.update);
+        window.addEventListener('resize', imageUpdater.debouncedUpdate);
     </script>
 </body>
 </html>
