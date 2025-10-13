@@ -115,6 +115,7 @@
         async function loadImages(path) {
             currentPath = path;
             document.getElementById('current-path').textContent = `/${path}`;
+            document.getElementById('up-button').disabled = path === '';
 
             const response = await fetch(`/list/${path}`);
             const items = await response.json();
