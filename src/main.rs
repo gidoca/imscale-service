@@ -6,7 +6,7 @@ use axum::{
     Router,
 };
 use chrono::{DateTime, Utc};
-use image::{self, imageops::FilterType, ImageReader};
+use image::{self, imageops::FilterType, ImageDecoder, ImageReader, DynamicImage};
 use serde::Deserialize;
 use serde_json::json;
 use std::env;
@@ -145,13 +145,28 @@ async fn download_handler(Path(path): Path<String>, params: Query<ResizeParams>)
 
     let format = reader.format().unwrap_or(image::ImageFormat::Png);
 
-    let img = match reader.decode() {
+    let mut decoder = match reader.into_decoder() {
         Ok(img) => img,
         Err(e) => {
             error!("Failed to decode image: {:?}, error: {}", full_path, e);
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
+    let orientation = match decoder.orientation() {
+        Ok(img) => img,
+        Err(e) => {
+            error!("Failed to decode image orientation of image: {:?}, error: {}", full_path, e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+    let mut img = match DynamicImage::from_decoder(decoder) {
+        Ok(img) => img,
+        Err(e) => {
+            error!("Failed to decode image: {:?}, error: {}", full_path, e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+    img.apply_orientation(orientation);
 
     let resized_img = if params.preserve_aspect_ratio.unwrap_or(false) {
         img.resize(params.width, params.height, FilterType::Lanczos3)
