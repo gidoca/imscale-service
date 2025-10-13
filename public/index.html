@@ -62,15 +62,20 @@
             const grid = document.getElementById('image-grid');
 
             for (const image of images) {
-                if (image.type === 'file') {
-                    const thumbnailUrl = `/download/${image.name}?width=200&height=200&preserve_aspect_ratio=true`;
-                    const gridItem = document.createElement('div');
-                    gridItem.className = 'grid-item';
-                    const img = document.createElement('img');
-                    img.src = thumbnailUrl;
-                    gridItem.appendChild(img);
-                    grid.appendChild(gridItem);
+                const gridItem = document.createElement('div');
+                gridItem.className = 'grid-item';
+                const img = document.createElement('img');
+
+                if (image.type === 'image') {
+                    img.src = `/download/${image.name}?width=200&height=200&preserve_aspect_ratio=true`;
+                } else if (image.type === 'directory') {
+                    img.src = '/icons/computer-folder-dual-tone-icon.svg';
+                } else {
+                    img.src = '/icons/text-document-dual-tone-icon.svg';
                 }
+                
+                gridItem.appendChild(img);
+                grid.appendChild(gridItem);
             }
         }
 

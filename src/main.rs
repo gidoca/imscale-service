@@ -25,6 +25,20 @@ struct ResizeParams {
     preserve_aspect_ratio: Option<bool>,
 }
 
+fn get_entry_type(path: &FilePath) -> &str {
+    if path.is_dir() {
+        return "directory";
+    }
+
+    match path.extension().and_then(|s| s.to_str()) {
+        Some(ext) => match ext.to_lowercase().as_str() {
+            "jpg" | "jpeg" | "png" | "gif" | "bmp" | "ico" | "tiff" | "webp" => "image",
+            _ => "file",
+        },
+        None => "file",
+    }
+}
+
 async fn list_handler(Path(path): Path<String>) -> Result<Json<serde_json::Value>, StatusCode> {
     let base_dir = env::var("IMAGE_DIR").unwrap_or_else(|_| "images".to_string());
     // Construct the full path
@@ -38,7 +52,7 @@ async fn list_handler(Path(path): Path<String>) -> Result<Json<serde_json::Value
     info!("Attempting to list path: {:?}", full_path);
 
     // Ensure the path starts with the base directory
-    if !full_path.starts_with(&base_dir) {
+    if !full_path.starts_with(&base_dir) || path.starts_with(".") {
         error!("Forbidden path: {:?}", full_path);
         return Err(StatusCode::FORBIDDEN);
     }
@@ -54,7 +68,12 @@ async fn list_handler(Path(path): Path<String>) -> Result<Json<serde_json::Value
             let entry = entry.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
             let path = entry.path();
             let name = path.file_name().unwrap().to_str().unwrap().to_string();
-            let entry_type = if path.is_dir() { "directory" } else { "file" };
+
+            if name.starts_with(".") {
+                continue;
+            }
+
+            let entry_type = get_entry_type(&path);
             entries.push(json!({ "name": name, "type": entry_type }));
         }
         Ok(Json(json!(entries)))
@@ -78,11 +97,17 @@ async fn list_handler(Path(path): Path<String>) -> Result<Json<serde_json::Value
             "width": width,
             "height": height,
             "download_url": download_url,
+            "type": get_entry_type(&full_path),
         })))
     }
 }
 
 async fn download_handler(Path(path): Path<String>, params: Query<ResizeParams>) -> Result<Response, StatusCode> {
+    if path.split('/').any(|segment| segment.starts_with(".")) {
+        error!("Forbidden path: {:?}", path);
+        return Err(StatusCode::FORBIDDEN);
+    }
+
     let base_dir = env::var("IMAGE_DIR").unwrap_or_else(|_| "images".to_string());
     let full_path = FilePath::new(&base_dir).join(&path);
     info!("Attempting to download image: {:?}", full_path);
