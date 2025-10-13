@@ -30,12 +30,22 @@
             font-family: sans-serif;
             font-size: 14px;
         }
+        #navigation {
+            padding: 10px;
+            background-color: #ddd;
+        }
     </style>
 </head>
 <body>
+    <div id="navigation">
+        <button id="up-button">Go up</button>
+        <span id="current-path">/</span>
+    </div>
     <div id="image-grid"></div>
 
     <script>
+        let currentPath = '';
+
         function createImageUpdater(imageElement) {
             let lastWidth = 0;
             let lastHeight = 0;
@@ -64,20 +74,27 @@
             };
         }
 
-        async function loadImages() {
-            const response = await fetch('/list/');
-            const images = await response.json();
-            const grid = document.getElementById('image-grid');
+        async function loadImages(path) {
+            currentPath = path;
+            document.getElementById('current-path').textContent = `/${path}`;
 
-            for (const image of images) {
+            const response = await fetch(`/list/${path}`);
+            const items = await response.json();
+            const grid = document.getElementById('image-grid');
+            grid.innerHTML = '';
+
+            for (const item of items) {
                 const gridItem = document.createElement('div');
                 gridItem.className = 'grid-item';
                 const img = document.createElement('img');
 
-                if (image.type === 'image') {
-                    img.src = `/download/${image.name}?width=200&height=200&preserve_aspect_ratio=true`;
-                } else if (image.type === 'directory') {
+                let fullPath = path ? `${path}/${item.name}` : item.name;
+
+                if (item.type === 'image') {
+                    img.src = `/download/${fullPath}?width=200&height=200&preserve_aspect_ratio=true`;
+                } else if (item.type === 'directory') {
                     img.src = '/icons/computer-folder-dual-tone-icon.svg';
+                    gridItem.addEventListener('click', () => loadImages(fullPath));
                 } else {
                     img.src = '/icons/text-document-dual-tone-icon.svg';
                 }
@@ -86,14 +103,20 @@
 
                 const filename = document.createElement('div');
                 filename.className = 'filename';
-                filename.textContent = image.name;
+                filename.textContent = item.name;
                 gridItem.appendChild(filename);
 
                 grid.appendChild(gridItem);
             }
         }
 
-        window.addEventListener('load', loadImages);
+        document.getElementById('up-button').addEventListener('click', () => {
+            const pathParts = currentPath.split('/');
+            pathParts.pop();
+            loadImages(pathParts.join('/'));
+        });
+
+        window.addEventListener('load', () => loadImages(''));
     </script>
 </body>
 </html>
