@@ -9,21 +9,23 @@
             margin: 0;
             padding: 0;
             width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
             background-color: #f0f0f0;
         }
-        img {
+        #image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            padding: 10px;
+        }
+        .grid-item img {
             width: 100%;
             height: 100%;
-            object-fit: contain;
+            object-fit: cover;
         }
     </style>
 </head>
 <body>
-    <img id="scaled-image" src="" alt="Scaled Image">
+    <div id="image-grid"></div>
 
     <script>
         function createImageUpdater(imageElement) {
@@ -54,11 +56,25 @@
             };
         }
 
-        const image = document.getElementById('scaled-image');
-        const imageUpdater = createImageUpdater(image);
+        async function loadImages() {
+            const response = await fetch('/list/');
+            const images = await response.json();
+            const grid = document.getElementById('image-grid');
 
-        window.addEventListener('load', imageUpdater.update);
-        window.addEventListener('resize', imageUpdater.debouncedUpdate);
+            for (const image of images) {
+                if (image.type === 'file') {
+                    const thumbnailUrl = `/download/${image.name}?width=200&height=200&preserve_aspect_ratio=true`;
+                    const gridItem = document.createElement('div');
+                    gridItem.className = 'grid-item';
+                    const img = document.createElement('img');
+                    img.src = thumbnailUrl;
+                    gridItem.appendChild(img);
+                    grid.appendChild(gridItem);
+                }
+            }
+        }
+
+        window.addEventListener('load', loadImages);
     </script>
 </body>
 </html>
