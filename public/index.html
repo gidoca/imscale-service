@@ -185,6 +185,12 @@
             }
         });
 
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closePopover();
+            }
+        });
+
         window.addEventListener('load', () => loadImages(''));
     </script>
 </body>
