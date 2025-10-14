@@ -64,6 +64,30 @@
             color: white;
             cursor: pointer;
         }
+        .nav-button {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 40px;
+            color: white;
+            cursor: pointer;
+            user-select: none;
+        }
+        .nav-button.prev {
+            left: 30px;
+        }
+        .nav-button.next {
+            right: 30px;
+        }
+        .nav-button:hover {
+            color: #bbb;
+        }
+        .nav-button.prev::before {
+            content: '\276E';
+        }
+        .nav-button.next::before {
+            content: '\276F';
+        }
     </style>
 </head>
 <body>
@@ -75,10 +99,14 @@
     <div id="popover" class="hidden">
         <span id="close-button">&times;</span>
         <img id="popover-image">
+        <span id="prev-button" class="nav-button prev"></span>
+        <span id="next-button" class="nav-button next"></span>
     </div>
 
     <script>
         let currentPath = '';
+        let imageList = [];
+        let currentImageIndex = -1;
         const popover = document.getElementById('popover');
         const popoverImage = document.getElementById('popover-image');
         const closeButton = document.getElementById('close-button');
@@ -121,18 +149,20 @@
             const items = await response.json();
             const grid = document.getElementById('image-grid');
             grid.innerHTML = '';
+            imageList = items.filter(item => item.type === 'image').map(item => path ? `${path}/${item.name}` : item.name);
 
             for (const item of items) {
                 const gridItem = document.createElement('div');
                 gridItem.className = 'grid-item';
                 const img = document.createElement('img');
 
-                let fullPath = path ? `${path}/${item.name}` : item.name;
-
                 if (item.type === 'image') {
-                    img.src = `/download/${fullPath}?width=200&height=200&preserve_aspect_ratio=true`;
-                    gridItem.addEventListener('click', () => openPopover(fullPath));
+                    const imagePath = path ? `${path}/${item.name}` : item.name;
+                    const imageIndex = imageList.indexOf(imagePath);
+                    img.src = `/download/${imagePath}?width=200&height=200&preserve_aspect_ratio=true`;
+                    gridItem.addEventListener('click', () => openPopover(imagePath, imageIndex));
                 } else if (item.type === 'directory') {
+                    const fullPath = path ? `${path}/${item.name}` : item.name;
                     img.src = '/icons/computer-folder-dual-tone-icon.svg';
                     gridItem.addEventListener('click', () => loadImages(fullPath));
                 } else {
@@ -150,7 +180,10 @@
             }
         }
 
-        function openPopover(imagePath) {
+        function openPopover(imagePath, imageIndex) {
+            currentImageIndex = imageIndex;
+            updateNavButtons();
+
             if (currentPopoverUpdater) {
                 window.removeEventListener('resize', currentPopoverUpdater.debouncedUpdate);
             }
@@ -186,9 +219,43 @@
             }
         });
 
+        function updateNavButtons() {
+            document.getElementById('prev-button').style.display = currentImageIndex > 0 ? 'block' : 'none';
+            document.getElementById('next-button').style.display = currentImageIndex < imageList.length - 1 ? 'block' : 'none';
+        }
+
+        function showPrevImage() {
+            if (currentImageIndex > 0) {
+                openPopover(imageList[currentImageIndex - 1], currentImageIndex - 1);
+            }
+        }
+
+        function showNextImage() {
+            if (currentImageIndex < imageList.length - 1) {
+                openPopover(imageList[currentImageIndex + 1], currentImageIndex + 1);
+            }
+        }
+
+        document.getElementById('prev-button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            showPrevImage();
+        });
+
+        document.getElementById('next-button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            showNextImage();
+        });
+
         window.addEventListener('keydown', (e) => {
+            if (popover.classList.contains('hidden')) return;
             if (e.key === 'Escape') {
                 closePopover();
+            }
+            if (e.key === 'ArrowLeft') {
+                showPrevImage();
+            }
+            if (e.key === 'ArrowRight') {
+                showNextImage();
             }
         });
 
