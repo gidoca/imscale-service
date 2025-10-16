@@ -56,6 +56,23 @@
             max-height: 90%;
             object-fit: contain;
         }
+        .spinner {
+            border: 8px solid #f3f3f3; /* Light grey */
+            border-top: 8px solid #3498db; /* Blue */
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 2s linear infinite;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            margin-top: -30px;
+            margin-left: -30px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
         #close-button {
             position: absolute;
             top: 20px;
@@ -97,6 +114,7 @@
     </div>
     <div id="image-grid"></div>
     <div id="popover" class="hidden">
+        <div id="spinner" class="spinner"></div>
         <span id="close-button">&times;</span>
         <img id="popover-image">
         <span id="prev-button" class="nav-button prev"></span>
@@ -180,6 +198,12 @@
             }
         }
 
+        const spinner = document.getElementById('spinner');
+
+        popoverImage.onload = () => {
+            spinner.style.display = 'none';
+        };
+
         function openPopover(imagePath, imageIndex) {
             currentImageIndex = imageIndex;
             updateNavButtons();
@@ -188,6 +212,7 @@
                 window.removeEventListener('resize', currentPopoverUpdater.debouncedUpdate);
             }
 
+            spinner.style.display = 'block';
             currentPopoverUpdater = createImageUpdater(popoverImage, imagePath);
             popover.classList.remove('hidden');
             
@@ -200,6 +225,7 @@
         function closePopover() {
             popover.classList.add('hidden');
             popoverImage.src = '';
+            spinner.style.display = 'none';
             if (currentPopoverUpdater) {
                 window.removeEventListener('resize', currentPopoverUpdater.debouncedUpdate);
                 currentPopoverUpdater = null;
