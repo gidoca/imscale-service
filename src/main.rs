@@ -32,7 +32,7 @@ fn get_entry_type(path: &FilePath) -> &str {
 
     match path.extension().and_then(|s| s.to_str()) {
         Some(ext) => match ext.to_lowercase().as_str() {
-            "jpg" | "jpeg" | "png" | "gif" | "bmp" | "ico" | "tiff" | "webp" => "image",
+            "jpg" | "jpeg" | "png" | "gif" | "bmp" | "ico" | "tiff" | "webp" | "avif" => "image",
             _ => "file",
         },
         None => "file",
@@ -186,6 +186,9 @@ async fn download_handler(Path(path): Path<String>, params: Query<ResizeParams>)
         image::ImageFormat::Png => "image/png",
         image::ImageFormat::Jpeg => "image/jpeg",
         image::ImageFormat::Gif => "image/gif",
+        image::ImageFormat::WebP => "image/webp",
+        image::ImageFormat::Avif => "image/avif",
+        image::ImageFormat::Tiff => "image/tiff",
         _ => "application/octet-stream",
     };
 
