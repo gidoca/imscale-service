@@ -84,6 +84,15 @@
             color: white;
             cursor: pointer;
         }
+        #download-button {
+            position: absolute;
+            top: 20px;
+            right: 80px;
+            font-size: 30px;
+            color: white;
+            cursor: pointer;
+            text-decoration: none;
+        }
         .nav-button {
             position: absolute;
             top: 50%;
@@ -132,6 +141,7 @@
     <div id="popover" class="hidden">
         <div id="spinner" class="spinner"></div>
         <span id="close-button">&times;</span>
+        <a id="download-button" class="download-button" download>&#x1F4BE;</a>
         <img id="popover-image" fetchPriority="high">
         <span id="prev-button" class="nav-button prev"></span>
         <span id="next-button" class="nav-button next"></span>
@@ -373,6 +383,8 @@
             if (currentPopoverUpdater) {
                 window.removeEventListener('resize', currentPopoverUpdater.debouncedUpdate);
             }
+
+            document.getElementById('download-button').href = `/download/${imagePath}`;
 
             spinner.style.display = 'block';
             currentPopoverUpdater = createImageUpdater(popoverImage, imagePath);

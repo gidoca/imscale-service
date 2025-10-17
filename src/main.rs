@@ -20,8 +20,8 @@ use urlencoding;
 
 #[derive(Deserialize)]
 struct ResizeParams {
-    width: u32,
-    height: u32,
+    width: Option<u32>,
+    height: Option<u32>,
     preserve_aspect_ratio: Option<bool>,
 }
 
@@ -179,16 +179,20 @@ async fn download_handler(Path(path): Path<String>, params: Query<ResizeParams>)
     };
     img.apply_orientation(orientation);
 
-    let resized_img = if params.preserve_aspect_ratio.unwrap_or(false) {
-        img.resize(params.width, params.height, FilterType::Lanczos3)
+    let processed_img = if let (Some(width), Some(height)) = (params.width, params.height) {
+        if params.preserve_aspect_ratio.unwrap_or(false) {
+            img.resize(width, height, FilterType::Lanczos3)
+        } else {
+            img.resize_exact(width, height, FilterType::Lanczos3)
+        }
     } else {
-        img.resize_exact(params.0.width, params.0.height, FilterType::Lanczos3)
+        img
     };
 
     let mut buffer = Vec::new();
     let mut cursor = std::io::Cursor::new(&mut buffer);
 
-    if let Err(e) = resized_img.write_to(&mut cursor, format) {
+    if let Err(e) = processed_img.write_to(&mut cursor, format) {
         error!("Failed to encode image: {:?}, error: {}", full_path, e);
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
