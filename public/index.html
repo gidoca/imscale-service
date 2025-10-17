@@ -37,6 +37,9 @@
             padding: 10px;
             background-color: #ddd;
         }
+	.current-path-part {
+	    cursor: pointer;
+	}
         #popover {
             position: fixed;
             top: 0;
@@ -116,7 +119,7 @@
     <div id="popover" class="hidden">
         <div id="spinner" class="spinner"></div>
         <span id="close-button">&times;</span>
-        <img id="popover-image">
+        <img id="popover-image" fetchPriority="high">
         <span id="prev-button" class="nav-button prev"></span>
         <span id="next-button" class="nav-button next"></span>
     </div>
@@ -165,7 +168,18 @@
 
         async function loadImages(path) {
             currentPath = path;
-            document.getElementById('current-path').textContent = `/${path}`;
+            const currentPathElement = document.getElementById('current-path');
+	    const pathParts = path.split('/');
+	    var pathPartElements = [];
+	    for (const [index, pathPart] of pathParts.entries()) {
+	        const pathPartElement = document.createElement('span');
+		pathPartElement.className = 'current-path-part';
+		pathPartElement.textContent = '/' + pathPart;
+		const currentPath = pathParts.slice(0, index + 1).join('/');
+		pathPartElement.addEventListener('click', () => navigate(currentPath));
+		pathPartElements.push(pathPartElement);
+	    }
+	    currentPathElement.replaceChildren(...pathPartElements);
             document.getElementById('up-button').disabled = path === '';
 
             const response = await fetch(`/list/${path}`);
