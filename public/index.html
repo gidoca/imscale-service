@@ -158,6 +158,11 @@
             };
         }
 
+        function navigate(path) {
+            history.pushState({path: path}, '', path ? `#/list/${path}` : '#/');
+            loadImages(path);
+        }
+
         async function loadImages(path) {
             currentPath = path;
             document.getElementById('current-path').textContent = `/${path}`;
@@ -182,7 +187,7 @@
                 } else if (item.type === 'directory') {
                     const fullPath = path ? `${path}/${item.name}` : item.name;
                     img.src = '/icons/computer-folder-dual-tone-icon.svg';
-                    gridItem.addEventListener('click', () => loadImages(fullPath));
+                    gridItem.addEventListener('click', () => navigate(fullPath));
                 } else {
                     img.src = '/icons/text-document-dual-tone-icon.svg';
                 }
@@ -205,37 +210,19 @@
         };
 
         function openPopover(imagePath, imageIndex) {
-            currentImageIndex = imageIndex;
-            updateNavButtons();
-
-            if (currentPopoverUpdater) {
-                window.removeEventListener('resize', currentPopoverUpdater.debouncedUpdate);
-            }
-
-            spinner.style.display = 'block';
-            currentPopoverUpdater = createImageUpdater(popoverImage, imagePath);
-            popover.classList.remove('hidden');
-            
-            setTimeout(() => {
-                currentPopoverUpdater.update();
-                window.addEventListener('resize', currentPopoverUpdater.debouncedUpdate);
-            }, 0);
+            history.pushState({imagePath: imagePath, imageIndex: imageIndex}, '', `#/show/${imagePath}`);
+            openPopoverForReal(imagePath, imageIndex);
         }
 
         function closePopover() {
-            popover.classList.add('hidden');
-            popoverImage.src = '';
-            spinner.style.display = 'none';
-            if (currentPopoverUpdater) {
-                window.removeEventListener('resize', currentPopoverUpdater.debouncedUpdate);
-                currentPopoverUpdater = null;
-            }
+            history.pushState({path: currentPath}, '', currentPath ? `#/list/${currentPath}` : '#/');
+            closePopoverForReal();
         }
 
         document.getElementById('up-button').addEventListener('click', () => {
             const pathParts = currentPath.split('/');
             pathParts.pop();
-            loadImages(pathParts.join('/'));
+            navigate(pathParts.join('/'));
         });
 
         closeButton.addEventListener('click', closePopover);
@@ -285,7 +272,69 @@
             }
         });
 
-        window.addEventListener('load', () => loadImages(''));
+        window.addEventListener('popstate', (event) => {
+            handleLocation();
+        });
+
+        function handleLocation() {
+            const hash = window.location.hash;
+
+            if (hash.startsWith('#/show/')) {
+                const imagePath = hash.substring(7);
+                const imageIndex = imageList.indexOf(imagePath);
+
+                // If the image is not in the current list, load the directory first.
+                if (imageIndex === -1) {
+                    const pathParts = imagePath.split('/');
+                    pathParts.pop();
+                    loadImages(pathParts.join('/')).then(() => {
+                        const imageIndex = imageList.indexOf(imagePath);
+                        if (imageIndex !== -1) {
+                            openPopoverForReal(imagePath, imageIndex);
+                        }
+                    });
+                } else {
+                    openPopoverForReal(imagePath, imageIndex);
+                }
+            } else if (hash.startsWith('#/list/')) {
+                const path = hash.substring(7);
+                closePopoverForReal();
+                loadImages(path);
+            } else {
+                closePopoverForReal();
+                loadImages('');
+            }
+        }
+
+        function openPopoverForReal(imagePath, imageIndex) {
+            currentImageIndex = imageIndex;
+            updateNavButtons();
+
+            if (currentPopoverUpdater) {
+                window.removeEventListener('resize', currentPopoverUpdater.debouncedUpdate);
+            }
+
+            spinner.style.display = 'block';
+            currentPopoverUpdater = createImageUpdater(popoverImage, imagePath);
+            popover.classList.remove('hidden');
+            
+            setTimeout(() => {
+                currentPopoverUpdater.update();
+                window.addEventListener('resize', currentPopoverUpdater.debouncedUpdate);
+            }, 0);
+        }
+
+        function closePopoverForReal() {
+            popover.classList.add('hidden');
+            popoverImage.src = '';
+            spinner.style.display = 'none';
+            if (currentPopoverUpdater) {
+                window.removeEventListener('resize', currentPopoverUpdater.debouncedUpdate);
+                currentPopoverUpdater = null;
+            }
+        }
+
+        window.addEventListener('load', () => handleLocation());
     </script>
 </body>
 </html>
