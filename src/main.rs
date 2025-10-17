@@ -73,8 +73,19 @@ async fn list_handler(Path(path): Path<String>) -> Result<Json<serde_json::Value
                 continue;
             }
 
+            let entry_metadata = match fs::metadata(&path) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+
             let entry_type = get_entry_type(&path);
-            entries.push(json!({ "name": name, "type": entry_type }));
+            let modified_time: DateTime<Utc> = entry_metadata.modified().unwrap_or(SystemTime::now()).into();
+            entries.push(json!({
+                "name": name,
+                "type": entry_type,
+                "size": entry_metadata.len(),
+                "modified": modified_time.to_rfc3339(),
+            }));
         }
         Ok(Json(json!(entries)))
     } else {

@@ -114,6 +114,19 @@
     <div id="navigation">
         <button id="up-button">Go up</button>
         <span id="current-path">/</span>
+        <div id="sorting-options">
+            <label for="sort-by">Sort by:</label>
+            <select id="sort-by">
+                <option value="name">Name</option>
+                <option value="modified">Date</option>
+                <option value="size">Size</option>
+                <option value="type">Type</option>
+            </select>
+            <select id="sort-direction">
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+            </select>
+        </div>
     </div>
     <div id="image-grid"></div>
     <div id="popover" class="hidden">
@@ -127,6 +140,7 @@
     <script>
         let currentPath = '';
         let imageList = [];
+        let items = [];
         let currentImageIndex = -1;
         const popover = document.getElementById('popover');
         const popoverImage = document.getElementById('popover-image');
@@ -183,10 +197,39 @@
             document.getElementById('up-button').disabled = path === '';
 
             const response = await fetch(`/list/${path}`);
-            const items = await response.json();
+            items = await response.json();
+            sortAndRenderItems();
+        }
+
+        function sortAndRenderItems() {
+            const sortBy = document.getElementById('sort-by').value;
+            const sortDirection = document.getElementById('sort-direction').value;
+
+            items.sort((a, b) => {
+                let aValue = a[sortBy];
+                let bValue = b[sortBy];
+
+                if (sortBy === 'name' || sortBy === 'type') {
+                    aValue = aValue.toLowerCase();
+                    bValue = bValue.toLowerCase();
+                }
+
+                if (aValue < bValue) {
+                    return sortDirection === 'asc' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortDirection === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+
+            renderGrid();
+        }
+
+        function renderGrid() {
             const grid = document.getElementById('image-grid');
             grid.innerHTML = '';
-            imageList = items.filter(item => item.type === 'image').map(item => path ? `${path}/${item.name}` : item.name);
+            imageList = items.filter(item => item.type === 'image').map(item => currentPath ? `${currentPath}/${item.name}` : item.name);
 
             for (const item of items) {
                 const gridItem = document.createElement('div');
@@ -194,12 +237,12 @@
                 const img = document.createElement('img');
 
                 if (item.type === 'image') {
-                    const imagePath = path ? `${path}/${item.name}` : item.name;
+                    const imagePath = currentPath ? `${currentPath}/${item.name}` : item.name;
                     const imageIndex = imageList.indexOf(imagePath);
                     img.src = `/download/${imagePath}?width=200&height=200&preserve_aspect_ratio=true`;
                     gridItem.addEventListener('click', () => openPopover(imagePath, imageIndex));
                 } else if (item.type === 'directory') {
-                    const fullPath = path ? `${path}/${item.name}` : item.name;
+                    const fullPath = currentPath ? `${currentPath}/${item.name}` : item.name;
                     img.src = '/icons/computer-folder-dual-tone-icon.svg';
                     gridItem.addEventListener('click', () => navigate(fullPath));
                 } else {
@@ -216,6 +259,9 @@
                 grid.appendChild(gridItem);
             }
         }
+
+        document.getElementById('sort-by').addEventListener('change', sortAndRenderItems);
+        document.getElementById('sort-direction').addEventListener('change', sortAndRenderItems);
 
         const spinner = document.getElementById('spinner');
 
