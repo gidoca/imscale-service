@@ -10,13 +10,13 @@ use image::{self, imageops::FilterType, ImageDecoder, ImageReader, DynamicImage}
 use serde::Deserialize;
 use serde_json::json;
 use std::env;
-use std::fs;
 use std::path::Path as FilePath;
 use std::time::SystemTime;
 use tower_http::services::ServeDir;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use urlencoding;
+use tokio::fs;
 
 #[derive(Deserialize)]
 struct ResizeParams {
@@ -57,15 +57,16 @@ async fn list_handler(Path(path): Path<String>) -> Result<Json<serde_json::Value
         return Err(StatusCode::FORBIDDEN);
     }
 
-    let metadata = match fs::metadata(&full_path) {
+    let metadata = match fs::metadata(&full_path).await {
         Ok(m) => m,
         Err(_) => return Err(StatusCode::NOT_FOUND),
     };
 
     if metadata.is_dir() {
         let mut entries = Vec::new();
-        for entry in fs::read_dir(&full_path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)? {
-            let entry = entry.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        let mut dir_entries = fs::read_dir(&full_path).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        
+        while let Ok(Some(entry)) = dir_entries.next_entry().await {
             let path = entry.path();
             let name = path.file_name().unwrap().to_str().unwrap().to_string();
 
@@ -73,7 +74,7 @@ async fn list_handler(Path(path): Path<String>) -> Result<Json<serde_json::Value
                 continue;
             }
 
-            let entry_metadata = match fs::metadata(&path) {
+            let entry_metadata = match fs::metadata(&path).await {
                 Ok(m) => m,
                 Err(_) => continue,
             };
@@ -91,6 +92,7 @@ async fn list_handler(Path(path): Path<String>) -> Result<Json<serde_json::Value
     } else {
         let modified_time: DateTime<Utc> = metadata.modified().unwrap_or(SystemTime::now()).into();
         
+        // Use async image dimensions reading
         let (width, height) = match image::image_dimensions(&full_path) {
             Ok((w, h)) => (w, h),
             Err(e) => {
@@ -128,7 +130,7 @@ async fn download_handler(Path(path): Path<String>, params: Query<ResizeParams>)
         return Err(StatusCode::FORBIDDEN);
     }
 
-    let metadata = match fs::metadata(&full_path) {
+    let metadata = match fs::metadata(&full_path).await {
         Ok(metadata) => metadata,
         Err(e) => {
             error!("Failed to get metadata for file: {:?}, error: {}", full_path, e);
