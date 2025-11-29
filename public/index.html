@@ -1,129 +1,314 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Imscale Service</title>
+    <title>Image Gallery</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body, html {
+        * {
             margin: 0;
             padding: 0;
-            width: 100%;
-            background-color: #f0f0f0;
+            box-sizing: border-box;
         }
-        #image-grid {
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px 0;
+            margin-bottom: 30px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        .btn:hover {
+            background-color: #2980b9;
+        }
+
+        .btn:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .gallery {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 10px;
-            padding: 10px;
+            gap: 15px;
+            margin-top: 20px;
         }
-        .grid-item {
+
+        .gallery-item {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            aspect-ratio: 4/3;
+            background-color: #ecf0f1;
             display: flex;
-            flex-direction: column;
             align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 10px;
             text-align: center;
         }
-        .grid-item img {
+
+        .gallery-item img {
             width: 100%;
-            height: 200px; /* Fixed height for the image container */
+            height: 100%;
             object-fit: contain;
+            transition: transform 0.3s;
         }
-        .grid-item .filename {
+
+        .gallery-item.directory {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .gallery-item.directory:hover {
+            background-color: #2980b9;
+        }
+
+        .gallery-item .file-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 8px;
+            font-size: 12px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .gallery-item:hover .file-info {
+            opacity: 1;
+        }
+
+        .gallery-item .icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .gallery-item.directory .icon {
+            color: white;
+        }
+
+        .gallery-item .name {
+            font-weight: bold;
             margin-top: 5px;
-            font-family: sans-serif;
             font-size: 14px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
-        #navigation {
-            padding: 10px;
-            background-color: #ddd;
-        }
-	.current-path-part {
-	    cursor: pointer;
-	}
-        #popover {
+
+        .popover {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0,0,0,0.8);
+            background: rgba(0, 0, 0, 0.9);
             display: flex;
-            justify-content: center;
             align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
         }
-        #popover.hidden {
-            display: none;
+
+        .popover.active {
+            opacity: 1;
+            pointer-events: all;
         }
-        #popover-image {
+
+        .popover-content {
+            position: relative;
             max-width: 90%;
             max-height: 90%;
-            object-fit: contain;
         }
-        .spinner {
-            border: 8px solid #f3f3f3; /* Light grey */
-            border-top: 8px solid #3498db; /* Blue */
-            border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            animation: spin 2s linear infinite;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            margin-top: -30px;
-            margin-left: -30px;
+
+        .popover-content img {
+            max-width: 90vw;
+            max-height: 80vh;
+            display: block;
+            margin: 0 auto;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        #close-button {
-            position: absolute;
-            top: 20px;
-            right: 30px;
-            font-size: 40px;
-            color: white;
-            cursor: pointer;
-        }
-        #download-button {
-            position: absolute;
-            top: 20px;
-            right: 80px;
-            font-size: 30px;
-            color: white;
-            cursor: pointer;
-            text-decoration: none;
-        }
-        .nav-button {
+
+        .popover-nav {
             position: absolute;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 40px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
             color: white;
+            font-size: 24px;
             cursor: pointer;
-            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s;
         }
-        .nav-button.prev {
-            left: 30px;
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
         }
-        .nav-button.next {
-            right: 30px;
+
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s;
         }
-        .nav-button:hover {
-            color: #bbb;
+
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
         }
-        .nav-button.prev::before {
-            content: '\276E';
+
+        .image-info {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: white;
+            font-size: 14px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            margin: 0 20px;
         }
-        .nav-button.next::before {
-            content: '\276F';
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+        }
+
+        .preload-container {
+            position: fixed;
+            top: -1000px;
+            left: -1000px;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+        }
+
+        .path-breadcrumb {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .path-breadcrumb a {
+            color: #3498db;
+            text-decoration: none;
+        }
+
+        .path-breadcrumb a:hover {
+            text-decoration: underline;
+        }
+
+        .path-breadcrumb span {
+            color: #666;
+        }
+
+        @media (max-width: 768px) {
+            .gallery {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+
+            .popover-nav {
+                padding: 0 10px;
+            }
+
+            .nav-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 18px;
+            }
         }
     </style>
 </head>
+
 <body>
-    <div id="navigation">
-        <button id="up-button">Go up</button>
-        <span id="current-path">/</span>
-        <div id="sorting-options">
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-images"></i> Image Gallery</h1>
+            <p>Browse and view your images</p>
+        </header>
+
+        <div class="path-breadcrumb" id="current-path">
+            <!-- Path breadcrumb will be generated here -->
+        </div>
+
+        <div class="controls">
             <label for="sort-by">Sort by:</label>
             <select id="sort-by">
                 <option value="name">Name</option>
@@ -135,17 +320,25 @@
                 <option value="asc">Ascending</option>
                 <option value="desc">Descending</option>
             </select>
+            <button id="up-button" class="btn" disabled><i class="fas fa-level-up-alt"></i> Up</button>
         </div>
+
+        <div id="image-grid" class="gallery"></div>
     </div>
-    <div id="image-grid"></div>
-    <div id="popover" class="hidden">
-        <div id="spinner" class="spinner"></div>
-        <span id="close-button">&times;</span>
-        <a id="download-button" class="download-button" download>&#x1F4BE;</a>
-        <img id="popover-image" fetchPriority="high">
-        <span id="prev-button" class="nav-button prev"></span>
-        <span id="next-button" class="nav-button next"></span>
+
+    <div id="popover" class="popover">
+            <div id="spinner" class="spinner"></div>
+            <img id="popover-image" src="" alt="Enlarged Image" fetchpriority="high">
+            <div class="popover-nav">
+                <button id="prev-button" class="nav-btn"><i class="fas fa-chevron-left"></i></button>
+                <button id="next-button" class="nav-btn"><i class="fas fa-chevron-right"></i></button>
+            </div>
+            <button id="close-button" class="close-btn"><i class="fas fa-times"></i></button>
+            <a id="download-button" class="download-button" download>&#x1F4BE;</a>
+            <div id="imageInfo" class="image-info"></div>
     </div>
+
+    <div id="preloadContainer" class="preload-container"></div>
 
     <script>
         let currentPath = '';
@@ -186,24 +379,24 @@
         }
 
         function navigate(path) {
-            history.pushState({path: path}, '', path ? `#/list/${path}` : '#/');
+            history.pushState({ path: path }, '', path ? `#/list/${path}` : '#/');
             loadImages(path);
         }
 
         async function loadImages(path) {
             currentPath = path;
             const currentPathElement = document.getElementById('current-path');
-	    const pathParts = path.split('/');
-	    var pathPartElements = [];
-	    for (const [index, pathPart] of pathParts.entries()) {
-	        const pathPartElement = document.createElement('span');
-		pathPartElement.className = 'current-path-part';
-		pathPartElement.textContent = '/' + pathPart;
-		const currentPath = pathParts.slice(0, index + 1).join('/');
-		pathPartElement.addEventListener('click', () => navigate(currentPath));
-		pathPartElements.push(pathPartElement);
-	    }
-	    currentPathElement.replaceChildren(...pathPartElements);
+            const pathParts = path.split('/');
+            var pathPartElements = [];
+            for (const [index, pathPart] of pathParts.entries()) {
+                const pathPartElement = document.createElement('span');
+                pathPartElement.className = 'current-path-part';
+                pathPartElement.textContent = '/' + pathPart;
+                const currentPath = pathParts.slice(0, index + 1).join('/');
+                pathPartElement.addEventListener('click', () => navigate(currentPath));
+                pathPartElements.push(pathPartElement);
+            }
+            currentPathElement.replaceChildren(...pathPartElements);
             document.getElementById('up-button').disabled = path === '';
 
             const response = await fetch(`/list/${path}`);
@@ -243,30 +436,43 @@
 
             for (const item of items) {
                 const gridItem = document.createElement('div');
-                gridItem.className = 'grid-item';
-                const img = document.createElement('img');
+                gridItem.className = 'gallery-item';
+                grid.appendChild(gridItem);
 
                 if (item.type === 'image') {
+                    const img = document.createElement('img');
+
                     const imagePath = currentPath ? `${currentPath}/${item.name}` : item.name;
                     const imageIndex = imageList.indexOf(imagePath);
-                    img.src = `/download/${imagePath}?width=200&height=200&preserve_aspect_ratio=true`;
+                    gridItem.appendChild(img);
+                    const imageWidth = img.offsetWidth;
+                    const imageHeight = img.offsetHeight;
+                    img.src = `/download/${imagePath}?width=${imageWidth}&height=${imageHeight}&preserve_aspect_ratio=true`;
                     gridItem.addEventListener('click', () => openPopover(imagePath, imageIndex));
                 } else if (item.type === 'directory') {
                     const fullPath = currentPath ? `${currentPath}/${item.name}` : item.name;
-                    img.src = '/icons/computer-folder-dual-tone-icon.svg';
+
+                    gridItem.classList.add('directory');
                     gridItem.addEventListener('click', () => navigate(fullPath));
+
+                    // Create directory icon
+                    const icon = document.createElement('div');
+                    icon.className = 'icon';
+                    icon.innerHTML = '<i class="fas fa-folder"></i>';
+
+                    gridItem.appendChild(icon);
                 } else {
+                    const img = document.createElement('img');
+
                     img.src = '/icons/text-document-dual-tone-icon.svg';
+                    gridItem.appendChild(img);
                 }
-                
-                gridItem.appendChild(img);
+
 
                 const filename = document.createElement('div');
-                filename.className = 'filename';
+                filename.className = 'name';
                 filename.textContent = item.name;
                 gridItem.appendChild(filename);
-
-                grid.appendChild(gridItem);
             }
         }
 
@@ -280,12 +486,12 @@
         };
 
         function openPopover(imagePath, imageIndex) {
-            history.pushState({imagePath: imagePath, imageIndex: imageIndex}, '', `#/show/${imagePath}`);
+            history.pushState({ imagePath: imagePath, imageIndex: imageIndex }, '', `#/show/${imagePath}`);
             openPopoverForReal(imagePath, imageIndex);
         }
 
         function closePopover() {
-            history.pushState({path: currentPath}, '', currentPath ? `#/list/${currentPath}` : '#/');
+            history.pushState({ path: currentPath }, '', currentPath ? `#/list/${currentPath}` : '#/');
             closePopoverForReal();
         }
 
@@ -330,7 +536,7 @@
         });
 
         window.addEventListener('keydown', (e) => {
-            if (popover.classList.contains('hidden')) return;
+            if (!popover.classList.contains('active')) return;
             if (e.key === 'Escape') {
                 closePopover();
             }
@@ -388,8 +594,8 @@
 
             spinner.style.display = 'block';
             currentPopoverUpdater = createImageUpdater(popoverImage, imagePath);
-            popover.classList.remove('hidden');
-            
+            popover.classList.add('active');
+
             setTimeout(() => {
                 currentPopoverUpdater.update();
                 window.addEventListener('resize', currentPopoverUpdater.debouncedUpdate);
@@ -397,7 +603,7 @@
         }
 
         function closePopoverForReal() {
-            popover.classList.add('hidden');
+            popover.classList.remove('active');
             popoverImage.src = '';
             spinner.style.display = 'none';
             if (currentPopoverUpdater) {
@@ -409,4 +615,5 @@
         window.addEventListener('load', () => handleLocation());
     </script>
 </body>
+
 </html>
