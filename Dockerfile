@@ -8,4 +8,5 @@ FROM debian
 COPY --from=build /usr/local/cargo/bin/imscale-service /imscale-service
 COPY public /public
 WORKDIR /
+EXPOSE 3000
 CMD ["/imscale-service"]
